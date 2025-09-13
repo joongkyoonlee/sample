@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>회사 회의실 예약</title>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f172a; --panel:#111827; --muted:#94a3b8; --text:#e5e7eb;
+    --brand:#4f46e5; --brand-2:#22d3ee; --ok:#10b981; --warn:#f59e0b; --err:#ef4444;
+    --border:rgba(255,255,255,.08); --radius:18px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 80% -10%, rgba(79,70,229,.25), transparent 60%),radial-gradient(900px 600px at -10% 20%, rgba(34,211,238,.18), transparent 60%), var(--bg); color:var(--text);font-family:Pretendard,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}
+  header{max-width:1100px;margin:24px auto 0;padding:24px;border:1px solid var(--border);background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));border-radius:var(--radius)}
+  header h1{margin:0;font-size:28px}
+  header p{margin:8px 0 0;color:var(--muted)}
+  .container{max-width:1100px;margin:18px auto 120px;display:grid;grid-template-columns:1.25fr .95fr;gap:20px}
+  @media (max-width:1000px){.container{grid-template-columns:1fr; padding:0 16px} header{margin:16px 16px 0}}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015)); border:1px solid var(--border); border-radius:var(--radius); padding:18px; box-shadow:0 20px 40px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.03)}
+  .rooms{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  @media (max-width:900px){.rooms{grid-template-columns:1fr}}
+  .room{background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border:1px solid var(--border); padding:16px;border-radius:16px}
+  .room h3{margin:0 0 8px;font-size:18px}
+  .tag{display:inline-block;padding:4px 8px;border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:12px;margin:4px 6px 0 0}
+  .cap{font-weight:600;color:#cbd5e1;margin-left:6px}
+  .muted{color:var(--muted)}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .form-col{display:flex;flex-direction:column;margin-bottom:12px}
+  label{font-size:13px;color:#cbd5e1;margin-bottom:6px}
+  input, select, textarea{background:#0b1224;border:1px solid var(--border); color:var(--text); padding:12px;border-radius:12px; outline:none; font-size:14px}
+  input:focus,select:focus,textarea:focus{border-color:#334155}
+  button{background:linear-gradient(90deg, var(--brand), var(--brand-2)); border:none;color:white;padding:12px 16px;border-radius:12px;font-weight:700;cursor:pointer}
+  button.secondary{background:transparent;border:1px solid var(--border);color:var(--text);font-weight:600}
+  .flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .between{display:flex;align-items:center;justify-content:space-between}
+  .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);color:#cbd5e1;font-size:12px}
+  .status{font-size:13px}
+  .success{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
+  table{width:100%;border-collapse:collapse;font-size:14px} th,td{padding:10px;border-bottom:1px solid var(--border)} th{text-align:left;color:#cbd5e1;font-weight:600}
+  dialog{border:1px solid var(--border); border-radius:16px; padding:0; background:#0b1224; color:var(--text); width:min(560px, 92vw)}
+  dialog header{border:none; box-shadow:none; margin:0; max-width:none; border-bottom:1px solid var(--border); border-radius:16px 16px 0 0}
+  dialog .body{padding:16px}
+  .footer{max-width:1100px;margin:24px auto 50px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+  <header>
+    <h1>회의실 예약</h1>
+    <p>실시간 예약 · 자동확정 메일 · 전일 알림(캘린더) · 노쇼 페널티 적용</p>
+  </header>
+
+  <div class="container">
+    <!-- 좌측: 회의실 정보 + 예약 폼 -->
+    <section class="card">
+      <div class="between" style="margin-bottom:10px">
+        <h2 style="margin:0;font-size:20px">회의실 & 설비</h2>
+        <span class="pill">운영시간 08:00–20:00</span>
+      </div>
+      <div class="rooms" id="rooms"></div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+      <h2 style="margin:0 0 10px;font-size:20px">예약 신청</h2>
+      <form id="bookingForm">
+        <div class="form-row">
+          <div class="form-col">
+            <label>이름</label>
+            <input required name="name" placeholder="신청자 성함">
+          </div>
+          <div class="form-col">
+            <label>전화번호</label>
+            <input required name="phone" placeholder="예: 010-1234-5678">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-col">
+            <label>이메일</label>
+            <input required type="email" name="email" placeholder="you@example.com">
+          </div>
+          <div class="form-col">
+            <label>회의실</label>
+            <select name="room" id="roomSelect"></select>
+          </div>
+        </div>
+        <!-- 날짜/시간 드롭다운 -->
+        <div class="form-row-3">
+          <div class="form-col">
+            <label>날짜</label>
+            <select required name="date" id="dateSelect"></select>
+          </div>
+          <div class="form-col">
+            <label>시작</label>
+            <select required name="start" id="startSelect"></select>
+          </div>
+          <div class="form-col">
+            <label>종료</label>
+            <select required name="end" id="endSelect"></select>
+          </div>
+        </div>
+        <div class="form-col">
+          <label>인원 (수용 인원 이내)</label>
+          <input required type="number" name="heads" min="1" value="3">
+        </div>
+        <div class="form-col">
+          <label>회의 목적 / 비고</label>
+          <textarea name="memo" rows="3" placeholder="예: 주간 운영회의"></textarea>
+        </div>
+        <div class="flex">
+          <button type="submit">예약 요청 및 자동 확정</button>
+          <button type="button" class="secondary" id="checkAvailabilityBtn">해당 시간대 빈 슬롯 확인</button>
+        </div>
+        <p id="formMsg" class="status" style="margin-top:8px"></p>
+      </form>
+    </section>
+
+    <!-- 우측: 내 예약 & 정책 & 관리자 -->
+    <aside class="card">
+      <h2 style="margin:0 0 10px;font-size:20px">나의 예약</h2>
+      <div class="form-row">
+        <div class="form-col">
+          <label>조회용 연락처(전화 또는 이메일)</label>
+          <input id="lookupKey" placeholder="010-1234-5678 또는 you@example.com">
+        </div>
+        <div class="form-col" style="align-self:end">
+          <button id="lookupBtn" type="button">조회</button>
+        </div>
+      </div>
+      <div id="myBookings"></div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+      <h2 style="margin:0 0 10px;font-size:20px">이용 정책</h2>
+      <ul class="muted" style="margin-top:6px;line-height:1.7">
+        <li>예약 즉시 확정되며, 동일 회의실 중복 시간에는 예약 불가.</li>
+        <li>노쇼 페널티: 1회 부도 시 1주, 2회 부도 시 3주 예약 제한.</li>
+        <li>연락처(전화/이메일)로 본인 예약 확인/수정/취소 가능.</li>
+        <li>전일 알림: 캘린더 초대(옵션: EmailJS 전일 리마인더).</li>
+      </ul>
+
+      <div class="admin">
+        <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+        <div class="between">
+          <h2 style="margin:0 0 10px;font-size:20px">관리자</h2>
+          <span class="pill">비번: <b>roomadmin123!</b></span>
+        </div>
+        <div class="form-row">
+          <div class="form-col"><input id="adminPass" placeholder="관리 비밀번호"></div>
+          <div class="form-col" style="align-self:end"><button id="adminLogin" type="button">로그인</button></div>
+        </div>
+        <div id="adminPanel" style="display:none">
+          <div class="form-row">
+            <div class="form-col"><select id="adminDate"></select></div>
+            <div class="form-col" style="align-self:end"><button id="adminLoad" type="button" class="secondary">해당일 예약 불러오기</button></div>
+          </div>
+          <div id="adminBookings"></div>
+          <p class="muted" style="margin-top:8px">예약 행의 [노쇼처리] 클릭 시 페널티 누적됩니다.</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="footer">
+    프론트엔드 전용 구현입니다. 메일 즉시 발송은 EmailJS, 전일 알림은 캘린더 초대(.ics)로 제공합니다.
+  </div>
+
+  <!-- EmailJS (선택) -->
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+  <script>
+    // ======= 환경설정 =======
+    const ADMIN_PASSWORD = 'roomadmin123!'; // ← 요청하신 기본 비번
+    const EMAILJS_PUBLIC_KEY = 'YOUR_EMAILJS_PUBLIC_KEY';
+    const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';
+    const EMAILJS_TEMPLATE_CONFIRM = 'tmpl_confirm';
+    const EMAILJS_TEMPLATE_REMINDER = 'tmpl_reminder';
+
+    if (EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY') {
+      emailjs.init(EMAILJS_PUBLIC_KEY);
+    }
+
+    // ======= 데이터 모델 =======
+    const ROOMS = [
+      { id:'a', name:'A 회의실', capacity:10, facilities:['55" 모니터','화이트보드'] },
+      { id:'b', name:'B 회의실', capacity:15, facilities:['빔 프로젝터'] },
+      { id:'c', name:'C 회의실', capacity:5,  facilities:['화이트보드'] },
+    ];
+    const OPEN_MIN = '08:00', CLOSE_MAX = '20:00';
+
+    const LS_BOOKINGS = 'room_bookings_v1';
+    const LS_NOSHOWS  = 'room_noshows_v1';
+    const LS_BANS     = 'room_bans_v1';
+
+    // ======= 유틸 =======
+    const $ = (sel) => document.querySelector(sel);
+    const pad2 = (n)=> String(n).padStart(2,'0');
+    const fmtDate = (d)=> new Date(d).toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'});
+    function toDateTime(dateStr, timeStr){
+      const [y,m,d] = dateStr.split('-').map(Number);
+      const [hh,mm] = timeStr.split(':').map(Number);
+      return new Date(y, m-1, d, hh, mm, 0, 0);
+    }
+    function overlaps(s1,e1,s2,e2){ return s1 < e2 && s2 < e1; }
+    function loadLS(key, defVal){ try{ return JSON.parse(localStorage.getItem(key)) || defVal }catch{ return defVal } }
+    function saveLS(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+    function contactKey(phone, email){ return (phone||'').trim().toLowerCase() || (email||'').trim().toLowerCase(); }
+    function now(){ return new Date(); }
+
+    // ======= 드롭다운 빌더 =======
+    function buildDateOptions(selectEl, days=60){
+      selectEl.innerHTML='';
+      const today = new Date();
+      for(let i=0;i<=days;i++){
+        const d = new Date(today.getFullYear(), today.getMonth(), today.getDate()+i);
+        const y = d.getFullYear(), m = pad2(d.getMonth()+1), dd = pad2(d.getDate());
+        const value = `${y}-${m}-${dd}`;
+        const label = d.toLocaleDateString('ko-KR', {weekday:'short', month:'2-digit', day:'2-digit'}) + ` (${y}-${m}-${dd})`;
+        const opt = document.createElement('option');
+        opt.value = value; opt.textContent = label;
+        selectEl.appendChild(opt);
+      }
+    }
+    function buildTimeOptions(selectEl){
+      selectEl.innerHTML='';
+      const [openH, openM] = OPEN_MIN.split(':').map(Number);
+      const [closeH, closeM] = CLOSE_MAX.split(':').map(Number);
+      for(let h=openH; h<=closeH; h++){
+        for(let m=(h===openH?openM:0); m<= (h===closeH?closeM:30); m+=30){
+          const time = `${pad2(h)}:${pad2(m)}`;
+          const opt = document.createElement('option');
+          opt.value = time; opt.textContent = time;
+          selectEl.appendChild(opt);
+        }
+      }
+    }
+
+    // ======= 가용성/페널티 =======
+    function findConflicts(roomId, dateStr, startStr, endStr){
+      const s = toDateTime(dateStr, startStr);
+      const e = toDateTime(dateStr, endStr);
+      if (startStr >= endStr) return { error: '종료 시간이 시작 시간보다 커야 합니다.' };
+      if (startStr < OPEN_MIN || endStr > CLOSE_MAX) return { error:'운영시간(08:00–20:00) 내에서만 예약 가능합니다.' };
+
+      const bookings = loadLS(LS_BOOKINGS, []);
+      const conflicts = bookings.filter(b=> b.roomId===roomId && b.date===dateStr && b.status!=='취소' && overlaps(new Date(b.start), new Date(b.end), s, e));
+      return { s, e, conflicts };
+    }
+    function isBanned(key){
+      const bans = loadLS(LS_BANS, {});
+      const until = bans[key];
+      if(!until) return null;
+      const dt = new Date(until);
+      if (now() < dt) return dt;
+      delete bans[key]; saveLS(LS_BANS, bans); return null;
+    }
+    function addNoShow(key){
+      const ns = loadLS(LS_NOSHOWS, {}); ns[key] = (ns[key]||0) + 1; saveLS(LS_NOSHOWS, ns);
+      const ban = loadLS(LS_BANS, {}); const n = ns[key]; const base = now();
+      if (n===1) ban[key] = new Date(base.getTime()+ 7*24*60*60*1000).toISOString();
+      else if (n>=2) ban[key] = new Date(base.getTime()+21*24*60*60*1000).toISOString();
+      saveLS(LS_BANS, ban); return ns[key];
+    }
+
+    // ======= .ics 생성 =======
+    function makeICS({title, desc, start, end}){
+      function pad(n){return String(n).padStart(2,'0')}
+      function icsTime(d){const z=new Date(d); return `${z.getUTCFullYear()}${pad(z.getUTCMonth()+1)}${pad(z.getUTCDate())}T${pad(z.getUTCHours())}${pad(z.getUTCMinutes())}00Z`}
+      const uid = `${Date.now()}@local`;
+      const ics = [
+        'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Meeting Rooms//ko','CALSCALE:GREGORIAN','METHOD:PUBLISH','BEGIN:VEVENT',
+        `UID:${uid}`,`DTSTAMP:${icsTime(new Date())}`,`DTSTART:${icsTime(start)}`,`DTEND:${icsTime(end)}`,
+        `SUMMARY:${title}`,`DESCRIPTION:${desc.replace(/\n/g,'\\n')}`,
+        'BEGIN:VALARM','ACTION:DISPLAY','TRIGGER:-PT24H','DESCRIPTION:회의 알림','END:VALARM',
+        'END:VEVENT','END:VCALENDAR'
+      ].join('\r\n');
+      const blob = new Blob([ics], {type:'text/calendar;charset=utf-8'});
+      return URL.createObjectURL(blob);
+    }
+
+    async function sendEmail(templateId, params){
+      if (!EMAILJS_PUBLIC_KEY || EMAILJS_PUBLIC_KEY === 'YOUR_EMAILJS_PUBLIC_KEY'){
+        console.warn('EmailJS 키 미설정: 이메일 건너뜀', params);
+        return { skipped:true };
+      }
+      return emailjs.send(EMAILJS_SERVICE_ID, templateId, params);
+    }
+
+    function saveBooking(bk){ const arr = loadLS(LS_BOOKINGS, []); arr.push(bk); saveLS(LS_BOOKINGS, arr); }
+    function updateBooking(updated){
+      const all = loadLS(LS_BOOKINGS, []);
+      const idx = all.findIndex(x=>x.id===updated.id);
+      if (idx>=0){ all[idx] = {...all[idx], ...updated}; saveLS(LS_BOOKINGS, all); }
+    }
+
+    // ======= UI 렌더 =======
+    function renderRooms(){
+      const wrap = $('#rooms'); wrap.innerHTML='';
+      ROOMS.forEach(r=>{
+        const el = document.createElement('div');
+        el.className='room';
+        el.innerHTML = `
+          <div class="between">
+            <h3>${r.name}</h3><span class="cap">${r.capacity}명</span>
+          </div>
+          <div class="muted" style="margin:6px 0 8px">설비</div>
+          <div class="flex">${r.facilities.map(f=>`<span class="tag">${f}</span>`).join('')}</div>
+        `;
+        wrap.appendChild(el);
+      });
+      const sel = $('#roomSelect');
+      sel.innerHTML = ROOMS.map(r=>`<option value="${r.id}">${r.name} (정원 ${r.capacity})</option>`).join('');
+    }
+
+    function renderMyBookings(items){
+      const box = $('#myBookings'); box.innerHTML='';
+      if (!items || items.length===0){ box.innerHTML = `<p class="muted">예약 내역이 없습니다.</p>`; return; }
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `
+        <table>
+          <thead><tr><th>일시</th><th>회의실</th><th>인원</th><th>상태</th><th></th></tr></thead>
+          <tbody>${items.map(b=>{
+            const sd = new Date(b.start), ed = new Date(b.end);
+            return `<tr data-id="${b.id}">
+              <td>${fmtDate(sd)} ${pad2(sd.getHours())}:${pad2(sd.getMinutes())}–${pad2(ed.getHours())}:${pad2(ed.getMinutes())}</td>
+              <td>${ROOMS.find(r=>r.id===b.roomId)?.name||b.roomId}</td>
+              <td>${b.heads}</td>
+              <td>${b.status||'확정'}</td>
+              <td>
+                <button class="secondary btn-edit" data-id="${b.id}">수정</button>
+                <button class="secondary btn-cancel" data-id="${b.id}">취소</button>
+              </td>
+            </tr>`
+          }).join('')}</tbody>
+        </table>
+      `;
+      box.appendChild(wrap);
+
+      // 취소
+      box.querySelectorAll('.btn-cancel').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const id = btn.dataset.id;
+          const all = loadLS(LS_BOOKINGS, []);
+          const idx = all.findIndex(x=>x.id===id);
+          if (idx>=0){
+            all[idx].status = '취소'; saveLS(LS_BOOKINGS, all);
+            alert('취소되었습니다.'); doLookup();
+          }
+        });
+      });
+
+      // 수정
+      box.querySelectorAll('.btn-edit').forEach(btn=>{
+        btn.addEventListener('click', ()=> openEditDialog(btn.dataset.id));
+      });
+    }
+
+    function doLookup(){
+      const key = $('#lookupKey').value.trim().toLowerCase();
+      const all = loadLS(LS_BOOKINGS, []);
+      const items = all.filter(b=> (b.email||'').toLowerCase()===key || (b.phone||'').toLowerCase()===key).sort((a,b)=> new Date(b.start)-new Date(a.start));
+      renderMyBookings(items);
+    }
+
+    // ======= 관리자 =======
+    function adminLoggedIn(){ return $('#adminPanel').style.display === 'block'; }
+    function openAdmin(){ $('#adminPanel').style.display='block'; }
+    function renderAdminDateSelect(){
+      const sel = $('#adminDate'); buildDateOptions(sel, 180);
+    }
+    function renderAdmin(dateStr){
+      const box = $('#adminBookings'); box.innerHTML='';
+      const list = loadLS(LS_BOOKINGS, []).filter(b=> b.date===dateStr).sort((a,b)=> new Date(a.start)-new Date(b.start));
+      if (list.length===0){ box.innerHTML = `<p class="muted">${dateStr} 예약 없음</p>`; return; }
+      const table = document.createElement('div');
+      table.innerHTML = `
+        <table>
+          <thead><tr><th>시간</th><th>회의실</th><th>신청자</th><th>연락처</th><th>인원</th><th>상태</th><th></th></tr></thead>
+          <tbody>
+            ${list.map(b=>{
+              const s = new Date(b.start), e = new Date(b.end);
+              const ck = contactKey(b.phone, b.email);
+              return `<tr data-id="${b.id}">
+                <td>${pad2(s.getHours())}:${pad2(s.getMinutes())}–${pad2(e.getHours())}:${pad2(e.getMinutes())}</td>
+                <td>${ROOMS.find(r=>r.id===b.roomId)?.name||b.roomId}</td>
+                <td>${b.name}</td>
+                <td>${b.phone}<br>${b.email}</td>
+                <td>${b.heads}</td>
+                <td>${b.status||'확정'}</td>
+                <td><button class="secondary btn-noshow" data-ck="${ck}">노쇼처리</button></td>
+              </tr>`
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+      box.appendChild(table);
+      box.querySelectorAll('.btn-noshow').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const ck = btn.dataset.ck;
+          const n = addNoShow(ck);
+          alert(`노쇼 ${n}회 누적. 페널티가 반영되었습니다.`);
+        });
+      });
+    }
+
+    // ======= 수정 다이얼로그 =======
+    function openEditDialog(bookingId){
+      const all = loadLS(LS_BOOKINGS, []);
+      const bk = all.find(x=>x.id===bookingId);
+      if (!bk){ return alert('예약을 찾을 수 없습니다.'); }
+
+      const dlg = document.createElement('dialog');
+      dlg.innerHTML = `
+        <header><div class="between"><h3 style="margin:0">예약 수정</h3><button style="background:transparent;border:none;color:#fff;font-weight:700;padding:12px 16px;cursor:pointer" id="dlgClose">×</button></div></header>
+        <div class="body">
+          <div class="form-row">
+            <div class="form-col">
+              <label>회의실</label>
+              <select id="editRoom">${ROOMS.map(r=>`<option value="${r.id}">${r.name} (정원 ${r.capacity})</option>`).join('')}</select>
+            </div>
+            <div class="form-col">
+              <label>인원</label>
+              <input type="number" id="editHeads" min="1" value="${bk.heads}">
+            </div>
+          </div>
+          <div class="form-row-3">
+            <div class="form-col">
+              <label>날짜</label>
+              <select id="editDate"></select>
+            </div>
+            <div class="form-col">
+              <label>시작</label>
+              <select id="editStart"></select>
+            </div>
+            <div class="form-col">
+              <label>종료</label>
+              <select id="editEnd"></select>
+            </div>
+          </div>
+          <div class="form-col">
+            <label>비고</label>
+            <textarea id="editMemo" rows="3">${bk.memo||''}</textarea>
+          </div>
+          <div class="between">
+            <button id="saveEdit">저장</button>
+            <button class="secondary" id="cancelEdit">닫기</button>
+          </div>
+          <p id="editMsg" class="status" style="margin-top:8px"></p>
+        </div>
+      `;
+      document.body.appendChild(dlg);
+
+      // 프리셋
+      const editDate = dlg.querySelector('#editDate');
+      const editStart = dlg.querySelector('#editStart');
+      const editEnd = dlg.querySelector('#editEnd');
+      buildDateOptions(editDate, 180); buildTimeOptions(editStart); buildTimeOptions(editEnd);
+
+      // 기존값 세팅
+      dlg.querySelector('#editRoom').value = bk.roomId;
+      dlg.querySelector('#editHeads').value = bk.heads;
+      editDate.value = bk.date;
+      const sD = new Date(bk.start), eD = new Date(bk.end);
+      editStart.value = `${pad2(sD.getHours())}:${pad2(sD.getMinutes())}`;
+      editEnd.value   = `${pad2(eD.getHours())}:${pad2(eD.getMinutes())}`;
+
+      // 이벤트
+      dlg.querySelector('#dlgClose').onclick = ()=> dlg.close();
+      dlg.querySelector('#cancelEdit').onclick = ()=> dlg.close();
+      dlg.querySelector('#saveEdit').onclick = ()=>{
+        const roomId = dlg.querySelector('#editRoom').value;
+        const heads = Number(dlg.querySelector('#editHeads').value||'1');
+        const date  = editDate.value;
+        const start = editStart.value;
+        const end   = editEnd.value;
+        const memo  = dlg.querySelector('#editMemo').value||'';
+        const room  = ROOMS.find(r=>r.id===roomId);
+
+        // 정원 체크
+        if (heads<1 || heads>room.capacity){ return dlg.querySelector('#editMsg').textContent='인원이 수용 인원을 초과합니다.'; }
+
+        // 가용성 체크(자기 자신 제외)
+        const chk = findConflicts(roomId, date, start, end);
+        const others = chk.conflicts.filter(c=> c.id !== bookingId);
+        if (chk.error){ return dlg.querySelector('#editMsg').textContent = chk.error; }
+        if (others.length>0){ return dlg.querySelector('#editMsg').textContent = '이미 예약된 시간대입니다.'; }
+
+        // 저장
+        updateBooking({
+          id: bookingId,
+          roomId, roomName: room.name,
+          date,
+          start: chk.s.toISOString(),
+          end:   chk.e.toISOString(),
+          heads, memo
+        });
+
+        // 새 .ics 다운로드(알림 시간 유지)
+        const icsUrl = makeICS({
+          title:`[${room.name}] 회의 예약(수정)`,
+          desc:`예약자: ${bk.name}\n연락처: ${bk.phone}\n인원: ${heads}명\n비고: ${memo||'-'}`,
+          start: chk.s, end: chk.e
+        });
+        const a = document.createElement('a'); a.href = icsUrl; a.download = `booking_${bookingId}.ics`; document.body.appendChild(a); a.click(); a.remove();
+
+        // (옵션) EmailJS로 변경 통지 재발송
+        // sendEmail(EMAILJS_TEMPLATE_CONFIRM, {
+        //   to_email: bk.email, to_name: bk.name, room_name: room.name,
+        //   date: `${date} ${start}–${end}`, capacity: room.capacity, heads, phone: bk.phone, memo: memo||'-', ics_link: icsUrl
+        // });
+
+        alert('예약 내용이 수정되었습니다.');
+        dlg.close(); doLookup();
+      };
+
+      dlg.showModal();
+    }
+
+    // ======= 이벤트 바인딩 =======
+    document.addEventListener('DOMContentLoaded', ()=>{
+      renderRooms();
+
+      // 신청 폼 드롭다운 세팅
+      buildDateOptions($('#dateSelect'), 60);
+      buildTimeOptions($('#startSelect'));
+      buildTimeOptions($('#endSelect'));
+
+      // 회의실 셀렉트
+      const sel = $('#roomSelect');
+      sel.innerHTML = ROOMS.map(r=>`<option value="${r.id}">${r.name} (정원 ${r.capacity})</option>`).join('');
+
+      // 가용성 확인
+      $('#checkAvailabilityBtn').addEventListener('click', ()=>{
+        const f = $('#bookingForm');
+        const roomId = f.room.value, date = f.date.value, start = f.start.value, end = f.end.value;
+        if(!date||!start||!end) return alert('날짜와 시간을 선택하세요.');
+        const {error, conflicts} = findConflicts(roomId, date, start, end);
+        if (error) return alert(error);
+        alert(conflicts.length>0 ? '해당 시간대는 이미 예약되어 있습니다.' : '해당 시간대 예약 가능!');
+      });
+
+      // 예약 제출
+      $('#bookingForm').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const msg = $('#formMsg'); msg.textContent='';
+        const f = e.target;
+        const name=f.name.value.trim(), phone=f.phone.value.trim(), email=f.email.value.trim();
+        const roomId=f.room.value, date=f.date.value, start=f.start.value, end=f.end.value;
+        const heads=Number(f.heads.value||'1'), memo=f.memo.value||'';
+        const room = ROOMS.find(r=>r.id===roomId);
+
+        // 인원/밴 체크
+        if (heads<1 || heads>room.capacity){ msg.textContent='인원 수가 수용 인원을 초과합니다.'; msg.className='status err'; return; }
+        const key = contactKey(phone,email); const banUntil = isBanned(key);
+        if (banUntil){ msg.innerHTML = `예약 제한 중입니다. 해제 시각: <strong>${new Date(banUntil).toLocaleString('ko-KR')}</strong>`; msg.className='status err'; return; }
+
+        // 가용성
+        const chk = findConflicts(roomId, date, start, end);
+        if (chk.error){ msg.textContent = chk.error; msg.className='status err'; return; }
+        if (chk.conflicts.length>0){ msg.textContent = '이미 예약된 시간대입니다.'; msg.className='status err'; return; }
+
+        // 저장
+        const id = 'bk_' + Date.now();
+        const startDT = chk.s, endDT = chk.e;
+        const bk = { id, name, phone, email, roomId, roomName: room.name, date, start: startDT.toISOString(), end: endDT.toISOString(), heads, memo, status:'확정' };
+        saveBooking(bk);
+
+        // 확정 메일 + .ics
+        const icsUrl = makeICS({
+          title:`[${room.name}] 회의 예약`,
+          desc:`예약자: ${name}\n연락처: ${phone}\n인원: ${heads}명\n비고: ${memo||'-'}`,
+          start:startDT, end:endDT
+        });
+        try{
+          await sendEmail(EMAILJS_TEMPLATE_CONFIRM, {
+            to_email: email, to_name: name, room_name: room.name,
+            date: `${date} ${start}–${end}`, capacity: room.capacity, heads, phone, memo: memo||'-', ics_link: icsUrl
+          });
+          msg.textContent = '예약 확정 및 확인 메일 발송 완료.'; msg.className='status success';
+        }catch(err){
+          console.warn(err); msg.textContent = '예약은 확정되었으나 이메일 발송에 실패했습니다.'; msg.className='status warn';
+        }
+        const a = document.createElement('a'); a.href = icsUrl; a.download = `booking_${id}.ics`; document.body.appendChild(a); a.click(); a.remove();
+
+        f.reset(); // 초기화
+        buildDateOptions($('#dateSelect'), 60); buildTimeOptions($('#startSelect')); buildTimeOptions($('#endSelect'));
+      });
+
+      // 조회
+      $('#lookupBtn').addEventListener('click', doLookup);
+
+      // 관리자
+      $('#adminLogin').addEventListener('click', ()=>{
+        if ($('#adminPass').value === ADMIN_PASSWORD){ openAdmin(); renderAdminDateSelect(); }
+        else alert('비밀번호가 올바르지 않습니다.');
+      });
+      $('#adminLoad').addEventListener('click', ()=>{
+        if (!adminLoggedIn()) return;
+        const ds = $('#adminDate').value; if (!ds) return alert('날짜를 선택하세요.');
+        renderAdmin(ds);
+      });
+    });
+  </script>
+</body>
+</html>
